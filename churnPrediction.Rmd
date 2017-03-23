@@ -1,0 +1,182 @@
+---
+title: "Predict Customer Churn"
+author: "Wedam NYaaba"
+date: "Feb 1, 2017"
+output:
+  html_document:
+    toc: yes
+    toc_depth: '3'
+  pdf_document:
+    toc: yes
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+&nbsp;
+&nbsp;
+
+
+\newpage
+
+#1. Read in Dataset
+```{r}
+# Clean the environment
+rm(list = ls())
+
+# Read data file
+df <- read.csv("Telco-Customer-Churn.csv")
+```
+
+#2. Exploring Data
+
+```{r}
+# Display head of data set
+head(df)
+```
+
+```{r}
+# Show Data structure 
+str(df)
+```
+
+```{r}
+# Display data Summary statistics
+summary(df)
+```
+Treat missing data
+
+```{r}
+# Remove NAs
+df <- na.omit(df) 
+```
+
+#3. Predictive Modeling
+
+```{r}
+# Load library
+library(caret)
+```
+
+In this section, we explore three different methods to predict customer churn 
+
+- Logistic Regression
+- Support Vector Machine (SVM)
+- Gradient Boosted Machine (GBM)
+
+
+## 3.1 Train Logistic Regression Method
+
+The train() method in the Caret package is used to train a regression/classification model.
+
+
+```{r}
+
+## Train a logistic regression model with 12-fold cross-validation
+fitControl <- trainControl(method = "cv",number = 12)
+
+set.seed(123)
+logit_fit <- train(Churn ~ ., data = df[-1],
+                   trControl = fitControl,
+                   method="glm", family=binomial(link='logit'))
+
+print(logit_fit)
+
+confusionMatrix(logit_fit)
+```
+
+Please note that in the train() function call, we needed to exclude customer ID as a predictor and so "data = df[-1]" was used. 
+
+
+
+## 3.2 Train Support Vector Machine Method
+
+```{r}
+## Train Support Vector Machine (Radial Basis Function Kernel) with 12-fold Cross-Validation
+set.seed(123)
+svmRadial_fit <- train(Churn ~ ., data = df[-1],
+                       trControl = fitControl, method = "svmRadial",
+                       verbose=FALSE)
+
+print(svmRadial_fit)
+
+confusionMatrix(svmRadial_fit)
+```
+
+```{r}
+# Plot resampling profile by accuracy
+plot(svmRadial_fit)
+```
+```{r}
+# Plot resampling profile by kappa statistic
+plot(svmRadial_fit, metric = "Kappa")
+```
+
+
+## 3.3 Train Gradient Boosted Machine (GBM) Method
+
+```{r}
+# Train GBM with 12-fold Cross-Validation
+set.seed(123)
+gbm_fit <- train(Churn ~ ., data = df[-1],
+                 trControl = fitControl, method = "gbm",
+                 verbose=FALSE)
+
+print(gbm_fit)
+
+confusionMatrix(gbm_fit)
+```
+
+```{r}
+# Obtain resampling profile (by accuracry) plot
+plot(gbm_fit)
+```
+
+```{r}
+# Obtain resampling profile (by kappa statistic) plot
+plot(gbm_fit, metric = "Kappa")
+```
+
+## 3.4 Compare Different Predictive Models
+
+```{r}
+# Collect resamples
+resamps <- resamples(list(Logit=logit_fit, SVM=svmRadial_fit, GBM = gbm_fit))
+```
+
+```{r}
+# Summarize the resamples
+summary(resamps)
+```
+
+```{r}
+# Visualize resamples
+bwplot(resamps)
+```
+
+
+Comparing the three models, we found that logistic regression model is the best since it has the highest levels of both accuracy and Kappa coefficient.
+
+It is possible to compute the differences between the models in order to use a simple t-test to evaluate the null hypothesis that there is no difference between models.
+
+```{r}
+difValues <- diff(resamps)
+difValues
+```
+
+```{r}
+summary(difValues)
+```
+
+From the above hypothesis test, it can be concluded that the difference among all the three models is not statistically significant based on their accuracy and inter-rater agreement(p = 0.0645). However, the Logit model has a performance better than SVM based on their Kappa statistic (p = 0.0001734).
+We can also plot the difference between models.
+```{r}
+bwplot(difValues, layout = c(3, 1))
+```
+
+```{r}
+dotplot(difValues)
+```
+
